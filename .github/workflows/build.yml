@@ -1,0 +1,27 @@
+name: Build Executable
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Add MSBuild to PATH
+      uses: microsoft/setup-msbuild@v2
+
+    - name: Build Solution
+      run: msbuild toggleHDR.sln /p:Configuration=Release /p:Platform=x64
+
+    - name: Upload Executable
+      uses: actions/upload-artifact@v4
+      with:
+        name: toggleHDR-executable
+        path: |
+          x64/Release/*.exe
+          Release/*.exe

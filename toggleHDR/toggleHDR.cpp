@@ -41,6 +41,9 @@ int main(int argc, char** argv) {
         delete[] paths; delete[] modes; return 1;
     }
 
+    BOOL toggledAny = FALSE;
+
+    // Iterate through all active display paths
     for (UINT32 i = 0; i < pathCount; ++i) {
         const auto& t = paths[i].targetInfo;
 
@@ -53,6 +56,10 @@ int main(int argc, char** argv) {
         if (DisplayConfigGetDeviceInfo(&g.header) != ERROR_SUCCESS)
             continue;
 
+        // Skip displays that don't support advanced color / HDR
+        if (!g.advancedColorSupported)
+            continue;
+
         const BOOL turnOn = g.advancedColorEnabled ? FALSE : TRUE;
 
 #if defined(DISPLAYCONFIG_DEVICE_INFO_SET_HDR_STATE) && defined(DISPLAYCONFIG_SET_HDR_STATE)
@@ -63,7 +70,9 @@ int main(int argc, char** argv) {
             s.header.adapterId = t.adapterId;
             s.header.id = t.id;
             s.enableHdr = turnOn ? 1u : 0u;
-            DisplayConfigSetDeviceInfo(&s.header);
+            if (DisplayConfigSetDeviceInfo(&s.header) == ERROR_SUCCESS) {
+                toggledAny = TRUE;
+            }
         }
 #else
         {
@@ -73,18 +82,19 @@ int main(int argc, char** argv) {
             s.header.adapterId = t.adapterId;
             s.header.id = t.id;
             s.enableAdvancedColor = turnOn ? 1u : 0u;
-            DisplayConfigSetDeviceInfo(&s.header);
+            if (DisplayConfigSetDeviceInfo(&s.header) == ERROR_SUCCESS) {
+                toggledAny = TRUE;
+            }
         }
 #endif
+    }
 
-        if (open_settings) {
-            Sleep(2000);
-            ShellExecuteA(nullptr, "open", "ms-settings:display", nullptr, nullptr, SW_SHOWNORMAL);
-            Sleep(1000);
-            system("taskkill /IM SystemSettings.exe /F >nul 2>&1");
-        }
-
-        break;
+    // Briefly launch settings once to force ICC profile reload for all displays
+    if (open_settings && toggledAny) {
+        Sleep(2000);
+        ShellExecuteA(nullptr, "open", "ms-settings:display", nullptr, nullptr, SW_SHOWNORMAL);
+        Sleep(1000);
+        system("taskkill /IM SystemSettings.exe /F >nul 2>&1");
     }
 
     delete[] paths;
